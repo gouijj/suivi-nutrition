@@ -178,7 +178,7 @@
   .hday .s { grid-column: 1 / -1; font-size: .82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
   ul.tips { margin: 0; padding-left: 1.1rem; display: grid; gap: 6px; }
   .photo-btns { display: grid; gap: 8px; }
-  .btn.photo { background: var(--blue); }
+  .btn.photo { background: var(--blue); white-space: nowrap; padding: 12px 8px; font-size: .95rem; }
   .err { color: var(--red); font-size: .9rem; margin: 0; }
   .ok-msg { color: var(--green); font-size: .9rem; margin: 0; }
   .wait { display: grid; justify-items: center; gap: 14px; padding: 30px 0; text-align: center; }
@@ -732,7 +732,9 @@ function renderSheet() {
     return head(s.replace ? 'Remplacer par…' : 'Ajouter un aliment', s.replace ? 'back-edit' : null) +
       (s.replace ? '' : `<div class="f"><span class="muted small">Repas</span><div class="seg">${REPAS.map((r) => `<button type="button" data-act="set-repas" data-v="${r}" aria-pressed="${s.repas === r}">${r}</button>`).join('')}</div></div>`) +
       (s.err ? `<p class="err">${esc(s.err)}</p>` : '') +
-      (!s.replace && iaReady() ? `<button class="btn photo block" data-act="photo-plate">📷 Photo de l’assiette</button>` : '') +
+      (!s.replace && iaReady() ? `<div class="f"><span class="muted small">Photo de l’assiette</span><div class="row">
+        <button class="btn photo" data-act="photo-plate" data-src="camera">📷 Appareil photo</button>
+        <button class="btn photo" data-act="photo-plate" data-src="gallery">🖼️ Galerie</button></div></div>` : '') +
       `<input type="search" id="q" placeholder="Rechercher : poulet, skyr, riz…" value="${esc(s.q || '')}" autocomplete="off">
       <div class="results" id="results">${searchResults(s)}</div>` +
       (s.replace ? '' : `<div style="display:grid"><button class="link" data-act="new-product">＋ Produit d’une étiquette</button><button class="link" data-act="free">＋ Saisie libre (restaurant, plat maison…)</button></div>`);
@@ -768,7 +770,9 @@ function renderSheet() {
   if (s.kind === 'product') {
     const v = s.v || {};
     return head(s.id ? 'Modifier le produit' : 'Nouveau produit', s.from === 'search' ? 'back-search' : null) +
-      (iaReady() ? `<button class="btn photo block" data-act="photo-label">📷 Remplir depuis une photo de l’étiquette</button>` : '') +
+      (iaReady() ? `<div class="f"><span class="muted small">Remplir depuis une photo de l’étiquette</span><div class="row">
+        <button class="btn photo" data-act="photo-label" data-src="camera">📷 Appareil photo</button>
+        <button class="btn photo" data-act="photo-label" data-src="gallery">🖼️ Galerie</button></div></div>` : '') +
       (s.err ? `<p class="err">${esc(s.err)}</p>` : '') +
       (s.note ? `<p class="note" style="margin:0">${esc(s.note)}</p>` : '') +
       `<p class="small muted" style="margin:0">${iaReady() ? 'Ou recopie' : 'Recopie'} le tableau « valeurs nutritionnelles pour 100 g » de l’étiquette. Le produit sera gardé pour la suite.</p>
@@ -985,8 +989,8 @@ app.addEventListener('click', (ev) => {
       UI.sheet = null; render(); toast(`Remplacé par ${f0(n.g)} g de ${f.nom.toLowerCase()}`); break;
     }
     case 'recap': openSheet({ kind: 'recap' }); break;
-    case 'photo-plate': pickPhoto('assiette', s); break;
-    case 'photo-label': pickPhoto('etiquette', s); break;
+    case 'photo-plate': pickPhoto('assiette', s, t.dataset.src === 'camera'); break;
+    case 'photo-label': pickPhoto('etiquette', s, t.dataset.src === 'camera'); break;
     case 'photo-retry': { const pe = document.getElementById('precision'); s.precision = pe ? pe.value : ''; runAnalysis('assiette', s.image, s.back, s.precision, s.repas); break; }
     case 'photo-add': {
       const day = ensureDay(UI.date); const items = s.items.filter((x) => x.on && String(x.nom).trim());
@@ -1083,9 +1087,11 @@ function fileToJpeg(file, max) {
   });
 }
 
-function pickPhoto(mode, from) {
+function pickPhoto(mode, from, camera) {
   const back = { ...from, err: '', focus: null };
   const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
+  // « capture » ouvre directement l'appareil photo arrière ; sans lui, le téléphone propose la galerie.
+  if (camera) inp.setAttribute('capture', 'environment');
   inp.onchange = async () => {
     const file = inp.files && inp.files[0]; if (!file) return;
     try {
